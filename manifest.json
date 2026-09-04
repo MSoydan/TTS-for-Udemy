@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Udemy TTS Pro",
+  "version": "3.0",
+  "description": "Udemy altyazılarını gelişmiş ayarlar ve akıllı hız kontrolüyle seslendirir.",
+  "permissions": ["activeTab", "storage"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.udemy.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        width: 320px;
+        padding: 15px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #1c1d1f; /* Udemy Dark Koyu Gri */
+        color: #d1d7dc;
+        margin: 0;
+      }
+      h2 {
+        font-size: 16px;
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #cec0fc; /* Soft Mor */
+        border-bottom: 1px solid #3e4143;
+        padding-bottom: 8px;
+      }
+      .group {
+        background: #2d2f31;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        border: 1px solid #3e4143;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      .form-group:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #9cb3c9;
+      }
+      select,
+      input[type="range"] {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid #3e4143;
+        border-radius: 4px;
+        font-size: 13px;
+        background-color: #1c1d1f;
+        color: #fff;
+      }
+      select:focus {
+        outline: none;
+        border-color: #cec0fc;
+      }
+
+      .flex-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .value-badge {
+        background: #3e4143;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: bold;
+        color: #cec0fc;
+      }
+
+      #testBtn {
+        width: 100%;
+        padding: 8px;
+        background-color: #a435f0; /* Udemy Mor Buton */
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 5px;
+        transition: background 0.2s;
+      }
+      #testBtn:hover {
+        background-color: #8710d8;
+      }
+      #testBtn:active {
+        transform: scale(0.98);
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        background: #1c1d1f;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #a435f0;
+      }
+      .checkbox-group label {
+        margin-bottom: 0;
+        font-weight: bold;
+        color: #fff;
+        cursor: pointer;
+      }
+      input[type="range"]:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Udemy Seslendirme (TTS)</h2>
+
+    <!-- Dil ve Ses Grubu -->
+    <div class="group">
+      <div class="form-group">
+        <label for="langSelect">1. Dil Seçimi:</label>
+        <select id="langSelect">
+          <option value="">Yükleniyor...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="voiceSelect">2. Okuyucu Ses:</label>
+        <select id="voiceSelect">
+          <option value="">Önce dil seçiniz</option>
+        </select>
+      </div>
+      <button id="testBtn">▶ Sesi Test Et</button>
+    </div>
+
+    <!-- Hız ve Ton Grubu -->
+    <div class="group">
+      <div class="form-group">
+        <div class="flex-row">
+          <label for="pitchSlider">Ses Tonu (Pitch):</label>
+          <span id="pitchValue" class="value-badge">1.0</span>
+        </div>
+        <input
+          type="range"
+          id="pitchSlider"
+          min="0.5"
+          max="2.0"
+          step="0.1"
+          value="1.0"
+        />
+      </div>
+
+      <div class="form-group">
+        <div class="flex-row">
+          <label for="rateSlider" id="rateLabel">Manuel Hız:</label>
+          <span id="rateValue" class="value-badge">1.0x</span>
+        </div>
+        <input
+          type="range"
+          id="rateSlider"
+          min="0.5"
+          max="2.0"
+          step="0.05"
+          value="1.0"
+        />
+      </div>
+
+      <div class="checkbox-group">
+        <input type="checkbox" id="autoSpeedCheck" />
+        <label
+          for="autoSpeedCheck"
+          title="Geride kalındığında hızı 2.5x'e kadar otomatik artırır."
+        >
+          ⚡ Auto Hız (Geride Kalınca)
+        </label>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

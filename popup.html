@@ -3,21 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
       body {
         width: 320px;
         padding: 15px;
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #1c1d1f; /* Udemy Dark Koyu Gri */
+        background-color: #1c1d1f;
         color: #d1d7dc;
         margin: 0;
       }
       h2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         font-size: 16px;
         margin-top: 0;
         margin-bottom: 15px;
-        color: #cec0fc; /* Soft Mor */
+        color: #cec0fc;
         border-bottom: 1px solid #3e4143;
         padding-bottom: 8px;
+      }
+      .brand-icon {
+        width: 28px;
+        height: 28px;
+        flex: none;
+        object-fit: contain;
       }
       .group {
         background: #2d2f31;
@@ -32,7 +47,10 @@
       .form-group:last-child {
         margin-bottom: 0;
       }
-
+      .form-group,
+      .group {
+        min-width: 0;
+      }
       label {
         display: block;
         font-size: 12px;
@@ -43,18 +61,25 @@
       select,
       input[type="range"] {
         width: 100%;
-        padding: 6px;
         border: 1px solid #3e4143;
         border-radius: 4px;
         font-size: 13px;
         background-color: #1c1d1f;
         color: #fff;
       }
+      select {
+        padding: 6px;
+      }
+      input[type="range"] {
+        display: block;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+      }
       select:focus {
         outline: none;
         border-color: #cec0fc;
       }
-
       .flex-row {
         display: flex;
         justify-content: space-between;
@@ -68,11 +93,10 @@
         font-weight: bold;
         color: #cec0fc;
       }
-
       #testBtn {
         width: 100%;
         padding: 8px;
-        background-color: #a435f0; /* Udemy Mor Buton */
+        background-color: #a435f0;
         color: white;
         border: none;
         border-radius: 4px;
@@ -87,7 +111,6 @@
       #testBtn:active {
         transform: scale(0.98);
       }
-
       .checkbox-group {
         display: flex;
         align-items: center;
@@ -96,13 +119,39 @@
         background: #1c1d1f;
         padding: 8px;
         border-radius: 6px;
-        border: 1px solid #a435f0;
+        border: 1px solid #3e4143;
+      }
+      .checkbox-group.highlight {
+        border-color: #a435f0;
       }
       .checkbox-group label {
         margin-bottom: 0;
         font-weight: bold;
         color: #fff;
         cursor: pointer;
+        font-size: 12px;
+      }
+      .setting-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border: 1px solid #9cb3c9;
+        border-radius: 50%;
+        color: #9cb3c9;
+        font-size: 10px;
+        line-height: 1;
+        cursor: help;
+      }
+      .info-icon:focus-visible {
+        outline: 2px solid #cec0fc;
+        outline-offset: 2px;
       }
       input[type="range"]:disabled {
         opacity: 0.4;
@@ -111,7 +160,10 @@
     </style>
   </head>
   <body>
-    <h2>Udemy Seslendirme (TTS)</h2>
+    <h2>
+      <img class="brand-icon" src="icons/icon48.png" alt="" />
+      <span>Udemy Seslendirme (TTS)</span>
+    </h2>
 
     <!-- Dil ve Ses Grubu -->
     <div class="group">
@@ -127,10 +179,30 @@
           <option value="">Önce dil seçiniz</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="setting-label" for="minWordsSelect">
+          Minimum kelime birleştirme sayısı
+          <span
+            class="info-icon"
+            tabindex="0"
+            role="img"
+            aria-label="Minimum kelime sayısı hakkında bilgi"
+            title="Daha akıcı bir konuşma için kısa cümleleri belirlediğiniz kelime sayısından itibaren birleştirir."
+            >ⓘ</span
+          >
+        </label>
+        <select id="minWordsSelect">
+          <option value="1">1 kelime</option>
+          <option value="3" selected>3 kelime</option>
+          <option value="5">5 kelime</option>
+          <option value="8">8 kelime</option>
+          <option value="12">12 kelime</option>
+        </select>
+      </div>
       <button id="testBtn">▶ Sesi Test Et</button>
     </div>
 
-    <!-- Hız ve Ton Grubu -->
+    <!-- Hız, Ton ve Davranış Grubu -->
     <div class="group">
       <div class="form-group">
         <div class="flex-row">
@@ -162,13 +234,24 @@
         />
       </div>
 
-      <div class="checkbox-group">
+      <div class="checkbox-group highlight">
         <input type="checkbox" id="autoSpeedCheck" />
         <label
           for="autoSpeedCheck"
-          title="Geride kalındığında hızı 2.5x'e kadar otomatik artırır."
+          title="Geride kalındığında hızı otomatik artırır."
         >
           ⚡ Auto Hız (Geride Kalınca)
+        </label>
+      </div>
+
+      <!-- YENİ: Video Durunca Ses Dursun mu? -->
+      <div class="checkbox-group">
+        <input type="checkbox" id="pauseSyncCheck" checked />
+        <label
+          for="pauseSyncCheck"
+          title="Eğitim videosu duraklatıldığında okuma da dursun."
+        >
+          ⏸️ Video Durunca Konuşmayı Durdur
         </label>
       </div>
     </div>

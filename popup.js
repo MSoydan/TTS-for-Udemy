@@ -6,31 +6,140 @@ document.addEventListener("DOMContentLoaded", () => {
   const pitchValue = document.getElementById("pitchValue");
   const rateValue = document.getElementById("rateValue");
   const autoSpeedCheck = document.getElementById("autoSpeedCheck");
+  const pauseSyncCheck = document.getElementById("pauseSyncCheck"); // YENİ
+  const minWordsSelect = document.getElementById("minWordsSelect");
   const rateLabel = document.getElementById("rateLabel");
   const testBtn = document.getElementById("testBtn");
 
   let allVoices = [];
+  const fallbackLanguageNames = {
+    ar: "العربية",
+    cs: "Čeština",
+    da: "Dansk",
+    de: "Deutsch",
+    el: "Ελληνικά",
+    en: "English",
+    es: "Español",
+    fi: "Suomi",
+    fr: "Français",
+    he: "עברית",
+    hi: "हिन्दी",
+    hu: "Magyar",
+    id: "Bahasa Indonesia",
+    it: "Italiano",
+    ja: "日本語",
+    ko: "한국어",
+    ms: "Bahasa Melayu",
+    nl: "Nederlands",
+    no: "Norsk",
+    pl: "Polski",
+    pt: "Português",
+    ro: "Română",
+    ru: "Русский",
+    sk: "Slovenčina",
+    sv: "Svenska",
+    th: "ไทย",
+    tr: "Türkçe",
+    uk: "Українська",
+    vi: "Tiếng Việt",
+    zh: "中文",
+  };
 
-  // 1. Sesleri Yükle ve Dilleri Grupla
+  function getAvailableVoices() {
+    const seenVoiceUris = new Set();
+    return speechSynthesis.getVoices().filter((voice) => {
+      if (
+        !voice ||
+        !voice.voiceURI ||
+        !voice.name ||
+        !voice.lang ||
+        seenVoiceUris.has(voice.voiceURI)
+      ) {
+        return false;
+      }
+
+      seenVoiceUris.add(voice.voiceURI);
+      return true;
+    });
+  }
+
+  function getLanguageName(languageTag) {
+    const language = languageTag.split("-")[0].toLowerCase();
+
+    try {
+      if (typeof Intl.DisplayNames === "function") {
+        return (
+          new Intl.DisplayNames([language], { type: "language" }).of(
+            language,
+          ) ||
+          fallbackLanguageNames[language] ||
+          "Other language"
+        );
+      }
+    } catch {
+      // Use the built-in names when DisplayNames is unavailable.
+    }
+
+    return fallbackLanguageNames[language] || "Other language";
+  }
+
+  function getLanguageLabel(languageTag, duplicateName) {
+    const languageName = getLanguageName(languageTag);
+    if (!duplicateName) return languageName;
+
+    const language = languageTag.split("-")[0].toLowerCase();
+    const region = languageTag
+      .split("-")
+      .find((part) => /^[A-Z]{2}$|^\d{3}$/i.test(part));
+    if (!region) return languageName;
+
+    let regionName = region;
+    try {
+      if (typeof Intl.DisplayNames === "function") {
+        regionName =
+          new Intl.DisplayNames([language], { type: "region" }).of(region) ||
+          region;
+      }
+    } catch {
+      // Keep the region abbreviation if localized region names are unavailable.
+    }
+
+    return `${languageName} (${regionName})`;
+  }
+
   function populateLanguages() {
-    allVoices = speechSynthesis.getVoices();
+    allVoices = getAvailableVoices();
     if (allVoices.length === 0) return;
 
-    // Benzersiz dilleri bul (örneğin: "tr-TR")
     const langs = [...new Set(allVoices.map((v) => v.lang))].sort();
+    const languageNameCounts = new Map();
+    langs.forEach((lang) => {
+      const name = getLanguageName(lang);
+      languageNameCounts.set(name, (languageNameCounts.get(name) || 0) + 1);
+    });
     langSelect.innerHTML = "";
 
-    // Dilleri listeye ekle (Türkçeyi daha anlaşılır yaz)
     langs.forEach((lang) => {
       const option = document.createElement("option");
       option.value = lang;
-      option.textContent = lang.includes("tr") ? `Türkçe (${lang})` : lang;
+      const languageName = getLanguageName(lang);
+      option.textContent = getLanguageLabel(
+        lang,
+        languageNameCounts.get(languageName) > 1,
+      );
       langSelect.appendChild(option);
     });
 
-    // Hafızadaki ayarları yükle, yoksa Türkçe varsayılan olsun
     chrome.storage.local.get(
-      ["ttsLang", "ttsVoice", "ttsPitch", "ttsRate", "ttsAutoSpeed"],
+      [
+        "ttsLang",
+        "ttsVoice",
+        "ttsPitch",
+        "ttsRate",
+        "ttsAutoSpeed",
+        "ttsPauseSync",
+        "ttsMinWords",
+      ],
       (res) => {
         if (res.ttsLang && langs.includes(res.ttsLang)) {
           langSelect.value = res.ttsLang;
@@ -39,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (trLang) langSelect.value = trLang;
         }
 
-        populateVoices(res.ttsVoice); // Sesi seç
+        populateVoices(res.ttsVoice);
 
         if (res.ttsPitch) {
           pitchSlider.value = res.ttsPitch;
@@ -53,38 +162,60 @@ document.addEventListener("DOMContentLoaded", () => {
           autoSpeedCheck.checked = res.ttsAutoSpeed;
           toggleAutoMode();
         }
+        if (res.ttsPauseSync !== undefined) {
+          pauseSyncCheck.checked = res.ttsPauseSync; // YENİ
+        }
+        if (res.ttsMinWords !== undefined) {
+          minWordsSelect.value = String(res.ttsMinWords);
+        }
       },
     );
   }
 
-  // 2. Seçili Dile Göre Sesleri Getir
   function populateVoices(savedVoiceURI = null) {
     const selectedLang = langSelect.value;
     const filteredVoices = allVoices.filter((v) => v.lang === selectedLang);
 
     voiceSelect.innerHTML = "";
+    voiceSelect.disabled = filteredVoices.length === 0;
+
+    if (filteredVoices.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "Kullanılabilir ses bulunamadı";
+      voiceSelect.appendChild(option);
+      return;
+    }
+
     filteredVoices.forEach((voice) => {
       const option = document.createElement("option");
       option.value = voice.voiceURI;
       let label = voice.name;
-      if (voice.name.includes("Natural")) label = "✨ " + label; // Edge Natural vurgusu
+      // "Natural" ve "Online" kelimeleri insansı sesleri belirtir (Özellikle Edge'de)
+      if (voice.name.includes("Natural") || voice.name.includes("Online")) {
+        label = "✨ " + label + " (Yüksek Kalite)";
+      }
       option.textContent = label;
       voiceSelect.appendChild(option);
     });
 
-    // Kayıtlı ses varsa seç, yoksa "Emel"i bul, yoksa ilkini seç
     if (
       savedVoiceURI &&
       filteredVoices.some((v) => v.voiceURI === savedVoiceURI)
     ) {
       voiceSelect.value = savedVoiceURI;
     } else {
-      const emel = filteredVoices.find((v) => v.name.includes("Emel"));
-      if (emel) voiceSelect.value = emel.voiceURI;
+      // Varsayılan olarak en kaliteli "Natural" sesi bulmaya çalış, yoksa Emel'i, yoksa ilkini seç
+      const bestVoice =
+        filteredVoices.find(
+          (v) => v.name.includes("Natural") || v.name.includes("Online"),
+        ) ||
+        filteredVoices.find((v) => v.name.includes("Emel")) ||
+        filteredVoices[0];
+      if (bestVoice) voiceSelect.value = bestVoice.voiceURI;
     }
   }
 
-  // Arayüzü Güncelle (Değerler ve Kilit Mekanizması)
   function updateLabels() {
     pitchValue.textContent = parseFloat(pitchSlider.value).toFixed(1);
     rateValue.textContent = parseFloat(rateSlider.value).toFixed(2) + "x";
@@ -102,7 +233,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Sesi Test Et
   testBtn.addEventListener("click", () => {
     speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(
@@ -114,12 +244,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedVoice) utter.voice = selectedVoice;
 
     utter.pitch = parseFloat(pitchSlider.value);
-    // Test ederken auto moddaysa standart hızı (1.0) veya seçili hızı kullan
     utter.rate = autoSpeedCheck.checked ? 1.0 : parseFloat(rateSlider.value);
     speechSynthesis.speak(utter);
   });
 
-  // Ayarları Kaydet
   function saveSettings() {
     const settings = {
       ttsLang: langSelect.value,
@@ -127,6 +255,8 @@ document.addEventListener("DOMContentLoaded", () => {
       ttsPitch: parseFloat(pitchSlider.value),
       ttsRate: parseFloat(rateSlider.value),
       ttsAutoSpeed: autoSpeedCheck.checked,
+      ttsPauseSync: pauseSyncCheck.checked, // YENİ
+      ttsMinWords: parseInt(minWordsSelect.value, 10),
     };
     chrome.storage.local.set(settings);
 
@@ -139,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Event Listeners
   langSelect.addEventListener("change", () => {
     populateVoices();
     saveSettings();
@@ -153,10 +282,13 @@ document.addEventListener("DOMContentLoaded", () => {
     toggleAutoMode();
     saveSettings();
   });
+  pauseSyncCheck.addEventListener("change", saveSettings); // YENİ
+  minWordsSelect.addEventListener("change", saveSettings);
 
-  // Başlat
-  populateLanguages();
-  if (speechSynthesis.onvoiceschanged !== undefined) {
+  if (typeof speechSynthesis.addEventListener === "function") {
+    speechSynthesis.addEventListener("voiceschanged", populateLanguages);
+  } else if ("onvoiceschanged" in speechSynthesis) {
     speechSynthesis.onvoiceschanged = populateLanguages;
   }
+  populateLanguages();
 });

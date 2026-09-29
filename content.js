@@ -1,4 +1,4 @@
-// === Udemy TTS PRO (Akıllı Hız ve Ton Modu) ===
+// === Udemy TTS PRO (Akıllı Hız, Ton Modu ve İnsansı Ses Optimizasyonu) ===
 
 const MIN_SENTENCE_LENGTH = 40;
 
@@ -7,6 +7,8 @@ let settings = {
   ttsPitch: 1.0,
   ttsRate: 1.0,
   ttsAutoSpeed: false,
+  ttsPauseSync: true, // YENİ: Varsayılan olarak video durduğunda ses de durur
+  ttsMinWords: 3,
 };
 
 let ttsQueue = [];
@@ -17,34 +19,74 @@ let videoElement = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateSettings") {
+    const previousSettings = settings;
     settings = request.settings;
-    if (isSpeaking) {
+
+    const speechSettingsChanged =
+      previousSettings.ttsVoice !== settings.ttsVoice ||
+      previousSettings.ttsPitch !== settings.ttsPitch ||
+      previousSettings.ttsRate !== settings.ttsRate ||
+      previousSettings.ttsAutoSpeed !== settings.ttsAutoSpeed;
+
+    if (speechSettingsChanged && isSpeaking) {
       speechSynthesis.cancel();
       isSpeaking = false;
       processQueue();
+    }
+
+    if (videoElement && videoElement.paused) {
+      if (settings.ttsPauseSync) {
+        speechSynthesis.pause();
+      } else {
+        speechSynthesis.resume();
+        if (!isSpeaking) {
+          lastSpokenBlockIndex = -1;
+          ttsTrigger();
+        }
+        processQueue();
+      }
     }
   }
 });
 
 chrome.storage.local.get(
-  ["ttsVoice", "ttsPitch", "ttsRate", "ttsAutoSpeed"],
+  [
+    "ttsVoice",
+    "ttsPitch",
+    "ttsRate",
+    "ttsAutoSpeed",
+    "ttsPauseSync",
+    "ttsMinWords",
+  ],
   (res) => {
     if (res.ttsVoice) settings.ttsVoice = res.ttsVoice;
     if (res.ttsPitch) settings.ttsPitch = res.ttsPitch;
     if (res.ttsRate) settings.ttsRate = res.ttsRate;
     if (res.ttsAutoSpeed !== undefined)
       settings.ttsAutoSpeed = res.ttsAutoSpeed;
+    if (res.ttsPauseSync !== undefined)
+      settings.ttsPauseSync = res.ttsPauseSync;
+    if (res.ttsMinWords !== undefined) settings.ttsMinWords = res.ttsMinWords;
   },
 );
 
 function getVoice() {
   const voices = speechSynthesis.getVoices();
   if (!voices.length) return null;
+
   if (settings.ttsVoice) {
     const selected = voices.find((v) => v.voiceURI === settings.ttsVoice);
     if (selected) return selected;
   }
+
+  // İnsansı Ses Optimizasyonu: Eğer kullanıcı henüz bir şey seçmediyse en iyi sesi kendimiz bulalım.
+  // Edge'in Natural sesleri her zaman Chrome'un standart seslerinden iyidir.
   return (
+    voices.find(
+      (v) =>
+        (v.name.includes("Natural") || v.name.includes("Online")) &&
+        v.lang.includes("tr"),
+    ) ||
     voices.find((v) => v.name.includes("Emel")) ||
     voices.find((v) => v.lang.includes("tr")) ||
     voices[0]
@@ -60,7 +102,9 @@ function cleanText(text) {
 }
 
 function processQueue() {
-  if (videoElement && videoElement.paused) return;
+  // YENİ MANTIK: Eğer video duraklatıldıysa ve kullanıcı "Video Durunca Sus" dediyse bekle
+  if (videoElement && videoElement.paused && settings.ttsPauseSync) return;
+
   if (isSpeaking || ttsQueue.length === 0) return;
 
   const block = ttsQueue.shift();
@@ -80,13 +124,9 @@ function processQueue() {
   let appliedPitch = settings.ttsPitch;
 
   if (settings.ttsAutoSpeed && ttsQueue.length > 0) {
-    // Kuyruktaki her cümle için hız artışı
     const speedBoost = ttsQueue.length * 0.15;
-    // Maksimum hız sınırı 2.5x
     appliedRate = Math.min(settings.ttsRate + speedBoost, 2.5);
 
-    // AKILLI TON DENGELEME (Pitch Compensation):
-    // Hız 1.8x'i geçtiğinde, ses incelip "sincaplaşmasın" diye pitch değerini hafifçe kalınlaştırır (düşürür).
     if (appliedRate > 1.8) {
       appliedPitch = Math.max(0.5, appliedPitch - 0.2);
     }
@@ -121,17 +161,30 @@ function getTranscriptSentences() {
 function buildBlocks(sentences) {
   const blocks = [];
   let temp = [];
+  const minWords = Math.max(1, Number(settings.ttsMinWords) || 1);
+
   for (let s of sentences) {
     const clean = s.trim();
     temp.push(clean);
     if (/[.!?]$/.test(clean)) {
       const joined = temp.join(" ");
-      if (joined.length < MIN_SENTENCE_LENGTH) continue;
+      const wordCount = joined.split(/\s+/).filter(Boolean).length;
+      if (joined.length < MIN_SENTENCE_LENGTH || wordCount < minWords) continue;
       blocks.push([...temp]);
       temp = [];
     }
   }
-  if (temp.length) blocks.push([...temp]);
+
+  if (temp.length) {
+    const trailingText = temp.join(" ");
+    const trailingWordCount = trailingText.split(/\s+/).filter(Boolean).length;
+    if (trailingWordCount < minWords && blocks.length > 0) {
+      blocks[blocks.length - 1].push(...temp);
+    } else {
+      blocks.push([...temp]);
+    }
+  }
+
   return blocks;
 }
 
@@ -165,7 +218,6 @@ function ttsTrigger() {
     }
   }
 
-  // Geri sarma veya ileri atlama durumu
   if (
     blockIndex < lastSpokenBlockIndex ||
     blockIndex > lastSpokenBlockIndex + 2
@@ -187,14 +239,18 @@ function ttsTrigger() {
 function setupVideoSync() {
   videoElement = document.querySelector("video");
   if (videoElement) {
-    videoElement.onpause = () => {
-      speechSynthesis.cancel();
-      isSpeaking = false;
-    };
-    videoElement.onplay = () => {
-      lastSpokenBlockIndex = -1;
-      ttsTrigger();
-    };
+    videoElement.addEventListener("pause", () => {
+      if (settings.ttsPauseSync) {
+        speechSynthesis.pause();
+      }
+    });
+    videoElement.addEventListener("play", () => {
+      if (settings.ttsPauseSync) {
+        speechSynthesis.resume();
+        if (!isSpeaking) lastSpokenBlockIndex = -1;
+        ttsTrigger();
+      }
+    });
   }
 }
 

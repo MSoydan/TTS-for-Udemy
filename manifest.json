@@ -1,11 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Udemy TTS Pro",
-  "version": "3.0",
-  "description": "Udemy altyazılarını gelişmiş ayarlar ve akıllı hız kontrolüyle seslendirir.",
+  "version": "4.0",
+  "description": "Udemy altyazılarını gelişmiş ayarlar, akıllı hız kontrolü ve video senkronizasyonu ile seslendirir.",
   "permissions": ["activeTab", "storage"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {
